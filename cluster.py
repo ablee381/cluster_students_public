@@ -33,7 +33,6 @@ clusters = np.array(kmeans.labels_)
 
 results_obj.data.insert(loc=0, column='clusters', value=clusters)
 
-# discrepancy between Progress Learning and everything gives key error
 organized_data = results_obj.data.sort_values(by=['clusters', 'name'])
 organized_data.to_csv(resultFile.split('.')[0] + '_CLUSTERED.csv')
 
