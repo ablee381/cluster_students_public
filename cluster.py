@@ -63,4 +63,5 @@ ax.set_ylabel(xy_labels[1], fontsize=15)
 for i in range(n):
     tmpi = np.where(clusters == i)
     plt.scatter(x[tmpi][:, 0], x[tmpi][:, 1], c=colors[i])
+plt.savefig(resultFile.split('.')[0]+'_pca.pdf', bbox_inches='tight')
 plt.show()
