@@ -3,9 +3,12 @@ from sklearn.decomposition import TruncatedSVD
 import matplotlib.pyplot as plt
 from assessmentClass import *
 import dill
+from read_questions import *
+from lang_process import *
+import numpy as np
 
 
-def cluster_students(resultFile, num_clusters=3):
+def cluster_students(resultFile, num_clusters=3, outDir='.'):
     results_obj = Results(resultFile, guessRate=0.2)
 
     if results_obj.type == 'Potts':
@@ -29,50 +32,50 @@ def cluster_students(resultFile, num_clusters=3):
 
     # discrepancy between Progress Learning and everything gives key error
     organized_data = results_obj.data.sort_values(by=['clusters', 'name'])
-    organized_data.to_csv(resultFile.split('.')[0] + '_CLUSTERED.csv')
+    organized_data.to_csv(outDir + '/' + resultFile.split('.')[0] + '_CLUSTERED.csv')
 
     cluster_means = results_obj.data.groupby(['clusters']).mean(numeric_only=True)
-    cluster_means.to_csv(resultFile.split('.')[0] + '_average_student.csv')
+    cluster_means.to_csv(outDir + '/' + resultFile.split('.')[0] + '_average_student.csv')
     return results_obj, data, standards, kmeans
 
 
-def prescribe_topic(results_obj, standards, question_series):
-    with open('topic_classifier.pkd', 'rb') as f:
-        model = dill.load(f)
-    topics = model.predict(question_series)
-    if len(topics) != len(standards):
+def prescribe_topic(results_obj, standards, question_series, outDir='.'):
+    if question_series is None:
         topics = np.array(standards)
+    else:
+        with open('topic_classifier.pkd', 'rb') as f:
+            model = dill.load(f)
+        topics = model.predict(question_series)
+        if len(topics) != len(standards):
+            topics = np.array(standards)
+
+    # make sure the data types of the column headers match with the standards
+    results_obj.data.columns = results_obj.data.columns.astype(str)
 
     unique_topics = np.unique(topics)
     class_avg = np.zeros(np.shape(unique_topics))
     class_stdev = np.zeros(np.shape(unique_topics))
     clusters = list(range(len(np.unique(results_obj.data['clusters']))))
-    zscore = np.zeros((len(clusters),len(unique_topics)))
+    zscore = np.zeros((len(clusters), len(unique_topics)))
+
     # pull out the data by topic
     for i in range(len(unique_topics)):
         topic = unique_topics[i]
         topic_columns = [standards[j] for j in range(len(topics)) if topic == topics[j]]
         topic_columns.append('clusters')
 
-        topic_df = results_obj.data[:, []].copy()
-        class_avg[i] = topic_df[topic_columns[:-1]].mean(axis=None)
-        class_stdev[i] = topic_df[topic_columns[:-1]].std(axis=None)
+        topic_df = results_obj.data[topic_columns].copy()
+        class_avg[i] = np.mean(topic_df[topic_columns[:-1]].stack())
+        class_stdev[i] = np.std(topic_df[topic_columns[:-1]].stack())
         for j in clusters:
-            raw_mean = topic_df[topic_df['clusters'] == j, topic_columns[:-1]].mean(axis=None)
-            zscore[j, i] = (raw_mean-class_avg)/class_stdev[i]
+            raw_mean = np.mean(topic_df.loc[topic_df['clusters'] == j].stack())
+            zscore[j, i] = (raw_mean-class_avg[i])/class_stdev[i]
     topic_recommendation = []
     for c in clusters:
         tmpi = np.argmin(zscore[c, :])
         topic_recommendation.append(unique_topics[tmpi])
-    to_df = {}
-    to_df['group']=clusters
-    to_df['topic']=topic_recommendation
-    pd.DataFrame(to_df).to_csv(results_obj.resultSheet.split('.')[0]+ '_recommendations.csv')
-    return topic_recommendation
-
-
-
-
+    to_df = {'group': clusters, 'topic': topic_recommendation}
+    pd.DataFrame(to_df).to_csv(outDir + '/' + results_obj.resultSheet.split('.')[0] + '_recommendations.csv')
 
 
 def visualize_space(data, standards, kmeans, printPCA=False):
@@ -115,6 +118,9 @@ def visualize_space(data, standards, kmeans, printPCA=False):
 
 
 if __name__ == '__main__':
-    resultFile = 'past_use/Macecevic_3.xlsx'
+    resultFile = 'demo/demo_test_results.xls'
     results_obj, data, standards, kmeans = cluster_students(resultFile)
-    visualize_space(data, standards, kmeans)
+    #visualize_space(data, standards, kmeans)
+    file_str = pull_tex_from_zip('demo/unit_test.tex.zip')
+    question_series = pd.Series(pull_test_w_questions(file_str))
+    prescribe_topic(results_obj, standards, question_series)

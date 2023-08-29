@@ -93,8 +93,8 @@ class Results:
         # get the student names
         namesL = []
         for i in range(2, m_row + 1):
-            last = sheet_obj.cell(row=i, column=2).value
-            first = sheet_obj.cell(row=i, column=3).value
+            last = str(sheet_obj.cell(row=i, column=2).value)
+            first = str(sheet_obj.cell(row=i, column=3).value)
             name = last + ', ' + first
             namesL.append(name)
         d['name'] = namesL
